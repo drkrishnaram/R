@@ -1,0 +1,173 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+library(data.table)
+library(tidyverse)
+library(arrow)
+
+```
+
+#readig CSV files
+
+```{r}
+map_df_fread <- function(path, pattern = "*.csv") {
+    list.files(path, pattern, full.names = TRUE) %>% 
+    map_df(~fread(.))
+}
+
+```
+
+```{r}
+tbl_poi<-map_df_fread(path="~/Desktop/CPHS/People of India") # 2.32 min
+
+```
+
+# writing parquer file
+
+```{r}
+write_parquet(tbl_poi, "poi.parquet")
+```
+
+```{r}
+tbl_HI<-map_df_fread(path="~/Desktop/CPHS/Household Income")
+```
+
+```{r}
+write_parquet(tbl_HI, "hi.parquet")
+
+```
+
+```{r}
+tbl_MCI<-map_df_fread(path="~/Desktop/CPHS/Consumption Expenditure/data") # 2:12 min
+
+```
+
+```{r}
+write_parquet(tbl_MCI, "mci.parquet")
+```
+
+
+```{r}
+tbl_mi1416<-map_df_fread(path="~/Desktop/CPHS/Member Income")
+```
+
+```{r}
+write_parquet(tbl_mi1416, "mi1416.parquet")
+
+```
+
+```{r}
+tbl_mi1621<-map_df_fread(path="~/Desktop/CPHS/Member Income/MI")
+
+```
+
+```{r}
+write_parquet(tbl_mi1621, "mi1721.parquet")
+
+```
+
+
+
+```{r}
+mi1416 <- read_parquet("mi1416.parquet")
+
+```
+```{r}
+mi1721 <- read_parquet("mi1721.parquet")
+
+```
+
+# reading parquet file
+```{r}
+mci <- read_parquet("mci.parquet")
+
+```
+
+# read poarquet with selected column
+
+```{r}
+mci <- read_parquet("mci.parquet",as_data_frame=FALSE) |>
+  filter(RESPONSE_STATUS=="Accepted") |>
+    select(1:7,9,10,13:27,28,31,32:33,35,38:39,42:43,65:66,81:82,91,92,118:121,127,128,132:133,135:136,155:172,183,184,184 )|>
+    compute()
+```
+
+```{r}
+dim(mci)
+```
+
+```{r}
+mci<-as.data.table(mci)
+```
+
+
+```{r}
+names(mci)
+```
+
+
+```{r}
+table(mci$REGION_TYPE)
+```
+
+```{r}
+table(mci$MONTH) 
+```
+
+# seperate month & year
+```{r}
+mci1<- mci%>%
+  separate(MONTH, into=c("month","year"))
+```
+
+```{r}
+table(mci1$year, mci1$month)
+```
+#names
+```{r}
+names(mci1)
+```
+
+```{r}
+rm(mci)
+```
+
+#mci1-names
+
+```{r}
+names(mci1)
+```
+# mci2-calculated mean 
+ 
+```{r}
+mci2<-mci1[,lapply(.SD,mean,na.rm=T),
+            .SDcols=c(21:70),
+            by=.(HH_ID,year)] 
+```
+
+# mci3- selcte chact col
+```{r}
+mci3<- mci1[, 1:20]
+```
+#mci4- dropped duplicate obs from x1 data
+```{r}
+mci4<-unique(mci3, by=c("HH_ID","year"))
+```
+# mci2424- merged mci2 and mci4
+
+```{r}
+mci24<-merge(mci2,
+           mci4,
+           all.x=T,
+           by=c("HH_ID","year"))
+```
+
+```{r}
+write_parquet(mci24, "mci.parquet")
+```
+
+
